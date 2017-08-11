@@ -4,6 +4,7 @@ class FieldDesc {
     protected $name;
     protected $value;
     protected $typeCode;
+    protected $className;
 
     public static function create($name, $typeCode, $value = null) {
         $a = new FieldDesc();
@@ -16,6 +17,15 @@ class FieldDesc {
         }
 
         return $a;
+    }
+
+    public function getClassName() {
+        return $this->className;
+    }
+
+    public function setClassName($className) {
+        $this->className = $className;
+        return $this;
     }
 
     public function getName() {
@@ -51,6 +61,7 @@ class FieldDesc {
                 ->ommitNull()
                 ->add("name", $this->getName())
                 ->add("typeCode", $this->getTypeCode())
+                ->add("className", $this->getClassName())
                 ->add("value", $this->getValue())
                 ->toString();
     }

@@ -7,6 +7,9 @@ class Constants {
     const LENGTH_SHORT = 2;
     const LENGTH_INT = 4;
     const LENGTH_LONG = 8;
+    const LENGTH_CHAR = 2;
+    const LENGTH_FLOAT = 4;
+    const LENGTH_DOUBLE = 8;
 
     // The following symbols in java.io.ObjectStreamConstants
     // define the terminal and constant values expected in a stream.
@@ -46,7 +49,7 @@ class Constants {
     const PRIM_TYPE_CODE_BOOLEAN = 'Z';
 
     const OBJECT_TYPE_CODE_ARRAY = '[';
-    const OBJECT_TYPE_CODE_PBJECT = 'L';
+    const OBJECT_TYPE_CODE_OBJECT = 'L';
 
     public static $PRIMITIVE_TYPE_CODES = array(
         Constants::PRIM_TYPE_CODE_BYTE,
@@ -57,5 +60,10 @@ class Constants {
         Constants::PRIM_TYPE_CODE_LONG,
         Constants::PRIM_TYPE_CODE_SHORT,
         Constants::PRIM_TYPE_CODE_BOOLEAN,
+    );
+
+    public static $OBJECT_TYPE_CODES = array(
+        Constants::OBJECT_TYPE_CODE_ARRAY,
+        Constants::OBJECT_TYPE_CODE_OBJECT,
     );
 }
