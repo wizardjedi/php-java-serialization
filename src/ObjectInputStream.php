@@ -15,83 +15,179 @@ class ObjectInputStream {
 
     protected $logEnabled = false;
 
+    protected $depth = 0;
+
     function __construct($buffer) {
         $this->buffer = $buffer;
 
         $this->length = strlen($buffer);
     }
 
+    /**
+     * @return ObjectInputStream
+     */
     public function log($msg, ...$args) {
         if ($this->logEnabled) {
             $str = call_user_func_array("sprintf", array_merge(array($msg), $args));
 
-            echo "offset:".$this->offset." => ".$str."\n";
+            echo
+                sprintf("%6d",$this->offset)
+                    .": ["
+                    .$this->bufferContents()
+                    ."] "
+                    .str_repeat(" ", 4*$this->depth)
+                    .$str
+                    ."\n";
         }
+
+        return $this;
+    }
+
+    public function bufferContents() {
+        $data = substr($this->buffer, $this->offset, 8);
+
+        $value = unpack("H*", $data);
+
+        $hexStr = $value[1];
+
+        $str = preg_replace('~(..)~', '$1 ', $hexStr);
+
+        return trim($str);
+    }
+
+    public function startGroup() {
+        $this->depth++;
+
+        return $this;
+    }
+
+    public function endGroup() {
+        if ($this->depth >= 1) {
+            $this->depth--;
+        }
+
+        return $this;
     }
 
     /**
-     *  object:
-     *    newObject
-     *    newClass
-     *    newArray
-     *    newString
-     *    newEnum
-     *    newClassDesc
-     *    prevObject
-     *    nullReference
-     *    exception
-     *    TC_RESET
+     *  object => TAG + objectSpec
+     *    [TC_OBJECT] newObject
+     *    [TC_CLASS] newClass
+     *    [TC_ARRAY] newArray
+     *    [TC_STRING] newString
+     *    [TC_LONG_STRING] newString
+     *    [TC_ENUM] newEnum
+     *    [TC_CLASSDESC] newClassDesc
+     *    [TC_PROXYCLASSDESC] newClassDesc
+     *    [TC_REFERENCE] prevObject
+     *    [TC_NULL] nullReference
+     *    [TC_EXCEPTION] exception
+     *    [TC_RESET]
      *
      *
      * @throws Exception
      */
     public function readObject() {
         if (!$this->headerChecked) {
+            $this->log("No header processed. Try to read header.");
+
             $this->readHeader();
         }
 
-        $this->log("Try to read object");
+        $this->log("Try to read object")->startGroup();
 
         $tag = Bits::readByte($this->readData(1));
 
-        $this->log("Got tag %s", dechex($tag));
+        $this->log("Got tag %s", Constants::tagMnemonic($tag));
 
-        if ($tag == Constants::TC_OBJECT) {
-            $this->log("Try to process TC_OBJECT");
+        $result = null;
 
-            $classDesc = $this->readClassDesc();
-
-            $this->log("Read class desc:%s", $classDesc->__toString());
-
-            $newObjectDesc = new ObjectDesc();
-            $newObjectDesc->setClassDesc($classDesc);
-
-            $this->newHandle($newObjectDesc);
-
-            $objectDesc = $this->readClassData($newObjectDesc);
-
-            $obj = $objectDesc->createObject();
-
-            return $obj;
-        } else {
-            throw new Exception("Unrecognized tag:".$tag);
+        switch ($tag) {
+            case Constants::TC_OBJECT:
+                $result = $this->readNewObject();
+                break;
+            case Constants::TC_CLASS:
+            case Constants::TC_ARRAY:
+            case Constants::TC_STRING:
+            case Constants::TC_LONG_STRING:
+            case Constants::TC_ENUM:
+            case Constants::TC_CLASSDESC:
+            case Constants::TC_PROXYCLASSDESC:
+            case Constants::TC_REFERENCE:
+            case Constants::TC_NULL:
+            case Constants::TC_EXCEPTION:
+            case Constants::TC_RESET:
+                throw new Exception("Unimplemented alternativ:".$tag);
+            default:
+                throw new Exception("Unrecognized tag:".$tag);
         }
 
-        throw new Exception("readObject not implemented");
+        $this->log("Finish read object")->endGroup();
+
+        return $result;
     }
 
     /**
-     * classDesc:
-     *  newClassDesc
-     *  nullReference
-     *  (ClassDesc)prevObject      // an object required to be of type
-     *                             // ClassDesc
+     *  newObject:
+     *    TC_OBJECT classDesc newHandle classdata[]  // data for each class
+     * @return type
+     */
+    public function readNewObject() {
+        $this->log("Try to process TC_OBJECT")->startGroup();
+
+        $classDesc = $this->readClassDesc();
+
+        $this->log("Read class desc:%s", $classDesc->__toString());
+
+        $newObjectDesc = new ObjectDesc();
+        $newObjectDesc->setClassDesc($classDesc);
+
+        $this->newHandle($newObjectDesc);
+
+        $objectDesc = $this->readClassData($newObjectDesc);
+
+        $obj = $objectDesc->createObject();
+
+        $this->log("Finished TC_OBJECT")->endGroup();
+
+        return $obj;
+    }
+
+    /**
+     *  classDesc => TAG + classDesc:
+     *    [TC_CLASSDESC] newClassDesc
+     *    [TC_PROXYCLASSDESC] newClassDesc
+     *    [TC_NULL] nullReference
+     *    [TC_REFERENCE] prevObject      // !!!an object required to be of type ClassDesc
      * @throws Exception
      */
     public function readClassDesc() {
-        $this->log("Try to read classDesc");
+        $this->log("Try to read classDesc")->startGroup();
 
-        return $this->readNewClassDesc();
+        $tag = Bits::readByte($this->readData(Constants::LENGTH_BYTE));
+
+        $this->log("Got tag:%s", Constants::tagMnemonic($tag));
+
+        $result = null;
+
+        switch ($tag) {
+            case Constants::TC_CLASSDESC:
+                $result = $this->readNewClassDesc();
+                break;
+            case Constants::TC_PROXYCLASSDESC:
+                throw new Exception("Unimplemented alternativ:".$tag);
+            case Constants::TC_NULL:
+                $result = null;
+                break;
+            case Constants::TC_REFERENCE:
+                throw new Exception("Unimplemented alternativ:".$tag);
+            default:
+                throw new Exception("Unrecognized tag:".$tag);
+        }
+
+        $this->log("Finished classDesc")->endGroup();
+
+        return $result;
     }
 
     /**
@@ -101,35 +197,27 @@ class ObjectInputStream {
      * @throws Exception
      */
     public function readNewClassDesc() {
-        $this->log("Try to read newClassDesc");
+        $this->log("Try to read newClassDesc")->startGroup();
 
-        $tag = Bits::readByte($this->readData(1));
+        $className = $this->readClassName();
 
-        $this->log("Got tag:%s", dechex($tag));
+        $this->log("Try to read serialVersionUid")->startGroup();
+        $serialVersionUid = Bits::readLong($this->readData(Constants::LENGTH_LONG));
+        $this->log("Got serial version UID:%d", $serialVersionUid)->endGroup();
 
-        if ($tag == Constants::TC_CLASSDESC) {
-            $this->log("Process TC_CLASSDESC");
+        $newClassDesc = new ClassDesc();
+        $newClassDesc->setName($className);
+        $newClassDesc->setSerialVersionUid($serialVersionUid);
 
-            $className = $this->readClassName();
+        $this->newHandle($newClassDesc);
 
-            $this->log("Try to read serialVersionUid");
-            $serialVersionUid = Bits::readLong($this->readData(Constants::LENGTH_LONG));
-            $this->log("Got serial version UID:%d", $serialVersionUid);
+        $this->readClassDescInfo($newClassDesc);
 
-            $newClassDesc = new ClassDesc();
-            $newClassDesc->setName($className);
-            $newClassDesc->setSerialVersionUid($serialVersionUid);
+        $result = $newClassDesc;
 
-            $this->newHandle($newClassDesc);
+        $this->log("Finished newClassDesc")->endGroup();
 
-            $this->readClassDescInfo($newClassDesc);
-
-            return $newClassDesc;
-        } else if ($tag == Constants::TC_NULL) {
-            return ;
-        } else {
-            throw new Exception("Unrecognized tag:".dechex($tag));
-        }
+        return $result;
     }
 
     /**
@@ -138,20 +226,21 @@ class ObjectInputStream {
      * @throws Exception
      */
     public function readClassDescInfo(ClassDesc $classDesc) {
-        $this->log("Try to read classDescInfo");
+        $this->log("Try to read classDescInfo")->startGroup();
 
+        $this->log("Read classDescFlags")->startGroup();
         $flags = $this->readClassDescFlags();
-
-        $this->log("Read flags:%s", $flags->__toString());
+        $this->log("Read flags:%s", $flags->__toString())->endGroup();
 
         $classDesc->setFlags($flags);
 
-        $this->log("Try to read fields");
         $this->readFields($classDesc);
 
         $this->readClassAnnotation();
 
         $this->readSuperClassDesc();
+
+        $this->log("Finished classDescInfo")->endGroup();
     }
 
     /**
@@ -174,6 +263,8 @@ class ObjectInputStream {
     public function readEndBlockData() {
         $tag = Bits::readByte($this->readData(Constants::LENGTH_BYTE));
 
+        $this->log("Got tag %s", Constants::tagMnemonic($tag));
+
         if ($tag == Constants::TC_ENDBLOCKDATA) {
             return ;
         } else {
@@ -183,6 +274,8 @@ class ObjectInputStream {
 
     public function readNull() {
         $tag = Bits::readByte($this->readData(Constants::LENGTH_BYTE));
+
+        $this->log("Got tag %s", Constants::tagMnemonic($tag));
 
         if ($tag == Constants::TC_NULL) {
             return ;
@@ -196,7 +289,7 @@ class ObjectInputStream {
      *    (short)<count>  fieldDesc[count]
      */
     public function readFields(ClassDesc $classDesc) {
-        $this->log("Try to read fields");
+        $this->log("Try to read fields")->startGroup();
 
         $fieldCount = Bits::readShort($this->readData(Constants::LENGTH_SHORT));
         $this->log("Got field count:%d", $fieldCount);
@@ -207,37 +300,46 @@ class ObjectInputStream {
             $classDesc->addFieldDesc($fieldDesc);
         }
 
-        var_dump($classDesc);die;
+        $this->log("Finished fields")->endGroup();
 
         return $classDesc;
     }
 
     /**
      *  fieldDesc:
-     *    primitiveDesc
-     *    objectDesc
+     *    [typeCode] primitiveDesc
+     *    [typeCode] objectDesc
      */
     public function readFieldDesc() {
-        $this->log("Try to read field desc");
+        $this->log("Try to read field desc")->startGroup();
 
+        $this->log("Read type code")->startGroup();
         $typeCode = $this->readData(Constants::LENGTH_BYTE);
         $this->log("Got type code:%s", $typeCode);
 
         $isPrimitive = in_array($typeCode, Constants::$PRIMITIVE_TYPE_CODES);
         $isObject = in_array($typeCode, Constants::$OBJECT_TYPE_CODES);
 
-        $this->log("isPrimitive:%s isObject:%s", $isPrimitive, $isObject);
+        $this->log("isPrimitive:%s isObject:%s", var_export($isPrimitive, true), var_export($isObject, true));
+
+        $this->endGroup();
+
+        $result = null;
 
         if ($isPrimitive || $isObject) {
             if ($isPrimitive) {
-                return $this->readPrimitiveDesc($typeCode);
+                $result = $this->readPrimitiveDesc($typeCode);
             } else {
-                return $this->readObjectDesc($typeCode);
+                $result = $this->readObjectDesc($typeCode);
             }
         } else {
             $offset = $this->offset;
             throw new Exception("Unrecognized type code:${typeCode} at offset ${offset}");
         }
+
+        $this->log("Finished fieldDesc")->endGroup();
+
+        return $result;
     }
 
     /**
@@ -252,19 +354,30 @@ class ObjectInputStream {
     }
 
     public function readObjectDesc($typeCode) {
-        $this->log("Try to read objectDesc");
+        $this->log("Try to read objectDesc")->startGroup();
 
-        $this->log("Try to read fieldName");
+        $this->log("Try to read fieldName")->startGroup();
         $fieldName = $this->readString();
-        $this->log("Got field name:%s", $fieldName);
+        $this->log("Got field name:%s", $fieldName)->endGroup();
 
-        $this->log("Try to read className");
+        $this->log("Try to read className")->startGroup();
+        $tag = Bits::readByte($this->readData(Constants::LENGTH_BYTE));
+
+        $this->log("Got tag %s", Constants::tagMnemonic($tag));
+
+        // TODO!!!
+        if ($tag != Constants::TC_STRING) {
+            throw new Exception("Unrecognized tag:".$tag);
+        }
+
         $className = $this->readString();
-        $this->log("Got className:%s", $className);
+        $this->log("Got className:%s", $className)->endGroup();
 
         $fieldDesc = FieldDesc::create($fieldName, $typeCode);
 
         $fieldDesc->setClassName($className);
+
+        $this->log("Finished objectDesc")->endGroup();
 
         return $fieldDesc;
     }
@@ -282,11 +395,11 @@ class ObjectInputStream {
      *    (utf)
      */
     public function readClassName() {
-        $this->log("Try to read className");
+        $this->log("Try to read className")->startGroup();
 
         $str = $this->readString();
 
-        $this->log("Read class name:'%s'", $str);
+        $this->log("Read class name:'%s'", $str)->endGroup();
 
         return $str;
     }
@@ -324,14 +437,18 @@ class ObjectInputStream {
     }
 
     public function readHeader() {
+        $this->log("Try to read header")->startGroup();
+
         $this->readMagic();
         $this->readStreamVersion();
 
         $this->headerChecked = true;
+
+        $this->log("Header ok")->endGroup();
     }
 
     public function readMagic() {
-        $this->log("Try to read magic");
+        $this->log("Try to read magic")->startGroup();
 
         $this->checkLength(Constants::LENGTH_MAGIC);
 
@@ -343,11 +460,11 @@ class ObjectInputStream {
             throw new Exception("Unrecognized magic: ".bin2hex($str));
         }
 
-        $this->log("Magic %s readed", dechex($unpackedValue[1]));
+        $this->log("Magic %s readed", dechex($unpackedValue[1]))->endGroup();
     }
 
     public function readStreamVersion() {
-        $this->log("Try to read stream version");
+        $this->log("Try to read stream version")->startGroup();
 
         $this->checkLength(Constants::LENGTH_STREAM_VERSION);
 
@@ -359,7 +476,7 @@ class ObjectInputStream {
             throw new Exception("Unrecognized stream version: ".bin2hex($str));
         }
 
-        $this->log("Stream %s readed", dechex($unpackedValue[1]));
+        $this->log("Stream version '%s' readed", dechex($unpackedValue[1]))->endGroup();
     }
 
     public function checkLength($len) {
@@ -369,15 +486,13 @@ class ObjectInputStream {
     }
 
     public function readData($len) {
-        $this->log("Try to read %d bytes", $len);
-
         $this->checkLength($len);
 
         $str = substr($this->buffer, $this->offset, $len);
 
         $this->offset += $len;
 
-        $this->log("Read '%s'", bin2hex($str));
+        $this->log("Read %d bytes '%s'", $len, bin2hex($str));
 
         return $str;
     }

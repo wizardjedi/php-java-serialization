@@ -66,4 +66,30 @@ class Constants {
         Constants::OBJECT_TYPE_CODE_ARRAY,
         Constants::OBJECT_TYPE_CODE_OBJECT,
     );
+
+    public static $TAGS = array(
+        Constants::TC_NULL => 'TC_NULL',
+        Constants::TC_REFERENCE => 'TC_REFERENCE',
+        Constants::TC_CLASSDESC => 'TC_CLASSDESC',
+        Constants::TC_OBJECT => 'TC_OBJECT',
+        Constants::TC_STRING => 'TC_STRING',
+        Constants::TC_ARRAY => 'TC_ARRAY',
+        Constants::TC_CLASS => 'TC_CLASS',
+        Constants::TC_BLOCKDATA => 'TC_BLOCKDATA',
+        Constants::TC_ENDBLOCKDATA => 'TC_ENDBLOCKDATA',
+        Constants::TC_RESET => 'TC_RESET',
+        Constants::TC_BLOCKDATALONG => 'TC_BLOCKDATALONG',
+        Constants::TC_EXCEPTION => 'TC_EXCEPTION',
+        Constants::TC_LONGSTRING => 'TC_LONGSTRING',
+        Constants::TC_PROXYCLASSDESC => 'TC_PROXYCLASSDESC',
+        Constants::TC_ENUM => 'TC_ENUM',
+    );
+
+    public static function tagMnemonic($tag) {
+        if (isset(self::$TAGS[$tag])) {
+            return dechex($tag).'('.self::$TAGS[$tag].')';
+        } else {
+            throw new Exception("Unrecognized tag:".dechex($tag));
+        }
+    }
 }
