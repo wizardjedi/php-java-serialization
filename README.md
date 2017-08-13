@@ -1,2 +1,2 @@
 # php-java-serialization
-PHPH Library for reading/writing JAVA serialized objects
+PHP Library for reading/writing JAVA serialized objects
