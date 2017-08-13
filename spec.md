@@ -1,6 +1,8 @@
 # Java serialization specification
 Source: https://docs.oracle.com/javase/8/docs/platform/serialization/spec/protocol.html
 
+This document created to clearify Java serialization specification. Rules reformated for more comfortable implementation process.
+
 ```
 stream:
   magic version contents
