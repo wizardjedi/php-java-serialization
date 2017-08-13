@@ -9,7 +9,7 @@ class ObjectInputStream {
 
     protected $cache;
 
-    protected $handle;
+    protected $handle = Constants::baseWireHandle;
 
     protected $headerChecked = false;
 
