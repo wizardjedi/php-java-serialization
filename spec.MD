@@ -1,3 +1,6 @@
+Java serialization specification
+Source: https://docs.oracle.com/javase/8/docs/platform/serialization/spec/protocol.html
+
 stream:
   magic version contents
 
