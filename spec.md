@@ -6,9 +6,15 @@ This document created to clearify Java serialization specification. Rules reform
 ```
 stream:
   magic version contents
+
+magic:
+  STREAM_MAGIC = 0xAC 0xED
+
+version:
+  STREAM_VERSION = 0x00 0x05
 ```
 
-Stream starts with MAGIC constant and stream version and then content of stream.
+Stream starts with MAGIC (ACED in hex) constant and stream version (nowadays its 5) and then content of stream.
 
 ```
 contents:
@@ -29,22 +35,35 @@ object => TAG + objectSpec
   [TC_OBJECT] newObject
   [TC_CLASS] newClass
   [TC_ARRAY] newArray
-  [TC_STRING] newString
-  [TC_LONG_STRING] newString
+  [TC_STRING] newString             // newString rule 2-byte for length
+  [TC_LONG_STRING] newString        // newString rule 8-bytes for length
   [TC_ENUM] newEnum
-  [TC_CLASSDESC] newClassDesc
-  [TC_PROXYCLASSDESC] newClassDesc
-  [TC_REFERENCE] prevObject
-  [TC_NULL] nullReference
+  [TC_CLASSDESC] newClassDesc       // classDesc rule
+  [TC_PROXYCLASSDESC] newClassDesc  // classDesc rule
+  [TC_REFERENCE] prevObject         // classDesc rule
+  [TC_NULL] nullReference           // classDesc rule
   [TC_EXCEPTION] exception
-  [TC_RESET]
+  [TC_RESET]                        // maybe in exception?
 ```
 Object represented by a several rules. For determine rule every rule contains 1-byte tag value that represent rule.
 So for parsing you have to read 1-byte tag value and then determine rule by this tag value.
 
 ```
+newObject:
+  TC_OBJECT classDesc newHandle classdata[]  // data for each class
+
 newClass:
   TC_CLASS classDesc newHandle
+
+newArray:
+  TC_ARRAY classDesc newHandle (int)<size> values[size]
+
+newString:
+  TC_STRING newHandle (utf)
+  TC_LONGSTRING newHandle (long-utf)
+
+newEnum:
+  TC_ENUM classDesc newHandle enumConstantName
 
 classDesc => TAG + classDesc:
   [TC_CLASSDESC] newClassDesc
@@ -52,12 +71,21 @@ classDesc => TAG + classDesc:
   [TC_NULL] nullReference
   [TC_REFERENCE] prevObject      // !!!an object required to be of type ClassDesc
 
-superClassDesc:
-  classDesc
-
 newClassDesc:
   TC_CLASSDESC className serialVersionUID newHandle classDescInfo
   TC_PROXYCLASSDESC newHandle proxyClassDescInfo
+
+prevObject
+  TC_REFERENCE (int)handle
+
+nullReference:
+  TC_NULL
+
+exception:
+  TC_EXCEPTION reset (Throwable)object	 reset // ? maybe TC_RESET ?
+
+superClassDesc:
+  classDesc
 
 classDescInfo:
   classDescFlags fields classAnnotation superClassDesc
@@ -116,12 +144,6 @@ obj_typecode:
   `[`	// array
   `L'	// object
 
-newArray:
-  TC_ARRAY classDesc newHandle (int)<size> values[size]
-
-newObject:
-  TC_OBJECT classDesc newHandle classdata[]  // data for each class
-
 classdata:
   nowrclass                 // SC_SERIALIZABLE & classDescFlag &&
                             // !(SC_WRITE_METHOD & classDescFlags)
@@ -164,35 +186,14 @@ externalContents:         // externalContent written by
   externalContent         // writeExternal in PROTOCOL_VERSION_1.
   externalContents externalContent
 
-newString:
-  TC_STRING newHandle (utf)
-  TC_LONGSTRING newHandle (long-utf)
-
-newEnum:
-  TC_ENUM classDesc newHandle enumConstantName
-
 enumConstantName:
   (String)object
 
-prevObject
-  TC_REFERENCE (int)handle
-
-nullReference
-  TC_NULL
-
-exception:
-  TC_EXCEPTION reset (Throwable)object	 reset
-
-magic:
-  STREAM_MAGIC
-
-version
-  STREAM_VERSION
- values:          // The size and types are described by the
+values:          // The size and types are described by the
                  // classDesc for the current object
- newHandle:       // The next number in sequence is assigned
+newHandle:       // The next number in sequence is assigned
                  // to the object being serialized or deserialized
- reset:           // The set of known objects is discarded
+reset:           // The set of known objects is discarded
                  // so the objects of the exception do not
                  // overlap with the previously sent objects
                  // or with objects that may be sent after
