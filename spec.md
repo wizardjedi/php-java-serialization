@@ -6,21 +6,31 @@ This document created to clearify Java serialization specification. Rules reform
 ```
 stream:
   magic version contents
+```
 
+Stream starts with MAGIC constant and stream version and then content of stream.
+
+```
 contents:
   content
   contents content
+```
+Content of stream is one or more content objects.
 
+```
 content:
   object
   blockdata
+```
+Content object could be object or block data.
 
+```
 object => TAG + objectSpec
   [TC_OBJECT] newObject
   [TC_CLASS] newClass
   [TC_ARRAY] newArray
   [TC_STRING] newString
-  [TC_LOMG_STRING] newString
+  [TC_LONG_STRING] newString
   [TC_ENUM] newEnum
   [TC_CLASSDESC] newClassDesc
   [TC_PROXYCLASSDESC] newClassDesc
@@ -28,7 +38,11 @@ object => TAG + objectSpec
   [TC_NULL] nullReference
   [TC_EXCEPTION] exception
   [TC_RESET]
+```
+Object represented by a several rules. For determine rule every rule contains 1-byte tag value that represent rule.
+So for parsing you have to read 1-byte tag value and then determine rule by this tag value.
 
+```
 newClass:
   TC_CLASS classDesc newHandle
 
