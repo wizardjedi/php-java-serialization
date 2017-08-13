@@ -1,6 +1,7 @@
-Java serialization specification
+# Java serialization specification
 Source: https://docs.oracle.com/javase/8/docs/platform/serialization/spec/protocol.html
 
+```
 stream:
   magic version contents
 
@@ -180,3 +181,4 @@ version
                  // overlap with the previously sent objects
                  // or with objects that may be sent after
                  // the exception
+```
