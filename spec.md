@@ -93,6 +93,10 @@ classDescInfo:
 className:
   (utf)
 
+(utf):
+(long-utf):
+    // Note that the symbol (utf) is used to designate a string written using 2-byte (unsigned short) length information, and (long-utf) is used to designate a string written using 8-byte length (signed long) information.
+
 serialVersionUID:
   (long)
 
