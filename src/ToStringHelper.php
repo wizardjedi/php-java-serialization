@@ -64,16 +64,14 @@ class ToStringHelper {
             $vals = $this->values;
         }
 
-        $newVals =
-            array_map(
-                function($el) {
-                    return var_export($el, true);
-                },
-                $vals
-            );
+        $newVals = array();
+
+        foreach ($vals as $name=>$value) {
+            $newVals[] = "${name}=".var_export($value, true);
+        }
 
         return
-            $this->clazz."[".implode(",", $newVals)."]";
+            $this->clazz."[\n".implode(",\n", $newVals)."\n]";
     }
 
     function getClazz() {
@@ -94,6 +92,4 @@ class ToStringHelper {
 
         return $this;
     }
-
-
 }

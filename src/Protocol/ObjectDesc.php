@@ -33,7 +33,12 @@ class ObjectDesc extends Handled {
         return $this;
     }
 
-    public function createObject() {
+    /**
+     *
+     * @param ObjectDesc $objectDesc
+     * @return mixed
+     */
+    public function createObject($objectDesc) {
         $name = $this->getClassDesc()->getName();
 
         $fullName = str_replace(array('.','$'), "\\", $name);

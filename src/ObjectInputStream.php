@@ -52,7 +52,13 @@ class ObjectInputStream {
 
         $str = preg_replace('~(..)~', '$1 ', $hexStr);
 
-        return trim($str);
+        $trimmed = trim($str);
+
+        if (empty($trimmed)) {
+            $trimmed = "    -=EMPTY BUFFER=-   ";
+        }
+
+        return $trimmed;
     }
 
     public function startGroup() {
@@ -109,7 +115,11 @@ class ObjectInputStream {
             case Constants::TC_CLASS:
             case Constants::TC_ARRAY:
             case Constants::TC_STRING:
+                $result = $this->readString();
+                break;
             case Constants::TC_LONG_STRING:
+                $result = $this->readLongString();
+                break;
             case Constants::TC_ENUM:
             case Constants::TC_CLASSDESC:
             case Constants::TC_PROXYCLASSDESC:
@@ -137,7 +147,11 @@ class ObjectInputStream {
 
         $classDesc = $this->readClassDesc();
 
-        $this->log("Read class desc:%s", $classDesc->__toString());
+        $this->log("Read class desc");
+
+        if ($this->logEnabled) {
+            echo $classDesc->toString()."\n";
+        }
 
         $newObjectDesc = new ObjectDesc();
         $newObjectDesc->setClassDesc($classDesc);
@@ -146,7 +160,7 @@ class ObjectInputStream {
 
         $objectDesc = $this->readClassData($newObjectDesc);
 
-        $obj = $objectDesc->createObject();
+        $obj = $objectDesc->createObject($objectDesc);
 
         $this->log("Finished TC_OBJECT")->endGroup();
 
@@ -193,7 +207,6 @@ class ObjectInputStream {
     /**
      *  newClassDesc:
      *    TC_CLASSDESC className serialVersionUID newHandle classDescInfo
-     *    TC_PROXYCLASSDESC newHandle proxyClassDescInfo
      * @throws Exception
      */
     public function readNewClassDesc() {
@@ -238,7 +251,9 @@ class ObjectInputStream {
 
         $this->readClassAnnotation();
 
-        $this->readSuperClassDesc();
+        $superClassDesc = $this->readSuperClassDesc();
+
+        $classDesc->setSuperClassDesc($superClassDesc);
 
         $this->log("Finished classDescInfo")->endGroup();
     }
@@ -248,7 +263,13 @@ class ObjectInputStream {
      *   classDesc
      */
     public function readSuperClassDesc() {
-        $this->readClassDesc();
+        $this->log("Try to read superClassDesc")->startGroup();
+
+        $result = $this->readClassDesc();
+
+        $this->log("Finished superClassDesc")->endGroup();
+
+        return $result;
     }
 
     /**
@@ -257,7 +278,13 @@ class ObjectInputStream {
      *  contents endBlockData      // contents written by annotateClass
      */
     public function readClassAnnotation() {
-        $this->readEndBlockData();
+        $this->log("Try to read classAnnotation")->startGroup();
+
+        $result = $this->readEndBlockData();
+
+        $this->log("Finished classAnnotation")->endGroup();
+
+        return $result;
     }
 
     public function readEndBlockData() {
@@ -348,16 +375,23 @@ class ObjectInputStream {
      * @throws Exception
      */
     public function readPrimitiveDesc($typeCode) {
-        $fieldName = $this->readString();
+        $fieldName = $this->readUtf();
 
         return FieldDesc::create($fieldName, $typeCode);
     }
 
+    /**
+     *  objectDesc:
+     *    obj_typecode fieldName className1
+     * @param type $typeCode
+     * @return type
+     * @throws Exception
+     */
     public function readObjectDesc($typeCode) {
         $this->log("Try to read objectDesc")->startGroup();
 
         $this->log("Try to read fieldName")->startGroup();
-        $fieldName = $this->readString();
+        $fieldName = $this->readUtf();
         $this->log("Got field name:%s", $fieldName)->endGroup();
 
         $this->log("Try to read className")->startGroup();
@@ -365,12 +399,17 @@ class ObjectInputStream {
 
         $this->log("Got tag %s", Constants::tagMnemonic($tag));
 
-        // TODO!!!
-        if ($tag != Constants::TC_STRING) {
-            throw new Exception("Unrecognized tag:".$tag);
+        switch ($tag) {
+            case Constants::TC_STRING:
+                $className = $this->readString();
+                break;
+            case Constants::TC_LONGSTRING:
+                $className = $this->readLongString();
+                break;
+            default:
+                throw new Exception("Unrecognized tag:".$tag);
         }
 
-        $className = $this->readString();
         $this->log("Got className:%s", $className)->endGroup();
 
         $fieldDesc = FieldDesc::create($fieldName, $typeCode);
@@ -397,7 +436,7 @@ class ObjectInputStream {
     public function readClassName() {
         $this->log("Try to read className")->startGroup();
 
-        $str = $this->readString();
+        $str = $this->readUtf();
 
         $this->log("Read class name:'%s'", $str)->endGroup();
 
@@ -408,6 +447,14 @@ class ObjectInputStream {
      * string:
      *   (utf)
      */
+    public function readUtf() {
+        $stringLength = Bits::readShort($this->readData(Constants::LENGTH_SHORT));
+
+        $str = $this->readData($stringLength);
+
+        return $str;
+    }
+
     public function readString() {
         $stringLength = Bits::readShort($this->readData(Constants::LENGTH_SHORT));
 
@@ -416,8 +463,20 @@ class ObjectInputStream {
         return $str;
     }
 
+    public function readLongString() {
+        $stringLength = Bits::readLong($this->readData(Constants::LENGTH_LONG));
+
+        $str = $this->readData($stringLength);
+
+        return $str;
+    }
+
     public function readClassData(ObjectDesc $objectDesc) {
-        foreach ($objectDesc->getClassDesc()->getFieldDescList() as $name => $fieldDesc) {
+        $classDesc = $objectDesc->getClassDesc();
+
+        $fields = $classDesc->getAllDeclaredFields();
+
+        foreach ($fields as $name => $fieldDesc) {
             $value = $this->readPrimitiveValueByTypeCode($fieldDesc->getTypeCode());
 
             $objectDesc->addField($name, $value);
@@ -428,6 +487,8 @@ class ObjectInputStream {
 
     public function newHandle(Handled $object) {
         $id = $this->handle++;
+
+        $this->log("Object saved with id:%d", $id);
 
         $object->setHandleId($id);
 
@@ -499,6 +560,7 @@ class ObjectInputStream {
 
     public function readPrimitiveValueByTypeCode($typeCode) {
         switch ($typeCode) {
+            // Primitive types
             case Constants::PRIM_TYPE_CODE_BYTE:
                 return Bits::readSigned($this->readData(Constants::LENGTH_BYTE));
             case Constants::PRIM_TYPE_CODE_CHAR:
@@ -515,18 +577,32 @@ class ObjectInputStream {
                 return Bits::readSigned($this->readData(Constants::LENGTH_SHORT));
             case Constants::PRIM_TYPE_CODE_BOOLEAN:
                 return Bits::readBoolean($this->readDate(Constants::LENGTH_BYTE));
+            // Object types
+            case Constants::OBJECT_TYPE_CODE_OBJECT:
+                $result = $this->readObject();
+
+                return $result;
+            case Constants::OBJECT_TYPE_CODE_ARRAY:
             default :
                 throw new Exception("unrecognized typecode=".$typeCode);
         }
     }
 
-    function getLogEnabled() {
+    public function getLogEnabled() {
         return $this->logEnabled;
     }
 
-    function setLogEnabled($logEnabled) {
+    public function setLogEnabled($logEnabled) {
         $this->logEnabled = $logEnabled;
         return $this;
+    }
+
+    public function throwException($exception) {
+        if ($exception instanceof ObjectStreamException) {
+            $exception->setOffset($this->offset);
+        }
+
+        throw $exception;
     }
 }
 

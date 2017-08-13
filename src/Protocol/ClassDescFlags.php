@@ -31,30 +31,33 @@ class ClassDescFlags {
         $result = array();
 
         if ($this->isWriteMethod()) {
-            $result[] = 'SC_WRITE_METHOD';
+            $result[] = Constants::SC_WRITE_METHOD.'=SC_WRITE_METHOD';
         }
 
         if ($this->isBlockData()) {
-            $result[] = 'SC_BLOCK_DATA';
+            $result[] = Constants::SC_BLOCK_DATA.'=SC_BLOCK_DATA';
         }
 
         if ($this->isSerializable()) {
-            $result[] = 'SC_SERIALIZABLE';
+            $result[] = Constants::SC_SERIALIZABLE.'=SC_SERIALIZABLE';
         }
 
         if ($this->isExternalizable()) {
-            $result[] = 'SC_EXTERNALIZABLE';
+            $result[] = Constants::SC_EXTERNALIZABLE.'=SC_EXTERNALIZABLE';
         }
 
         if ($this->isEnum()) {
-            $result[] = 'SC_ENUM';
+            $result[] = Constants::SC_ENUM.'=SC_ENUM';
         }
 
         return $result;
     }
 
-    public function __toString() {
-        return "ClassDescFlags[".implode(',', $this->getFlags())."]";
+    public function toString() {
+        return "ClassDescFlags[value=".$this->flags.", flags=".implode(',', $this->getFlags())."]";
     }
 
+    public function __toString() {
+        return $this->toString();
+    }
 }

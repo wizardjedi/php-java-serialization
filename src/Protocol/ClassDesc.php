@@ -9,6 +9,27 @@ class ClassDesc extends Handled {
 
     protected $flags;
 
+    protected $annotations;
+
+    protected $superClassDesc;
+
+    function getAnnotations() {
+        return $this->annotations;
+    }
+
+    function getSuperClassDesc() {
+        return $this->superClassDesc;
+    }
+
+    function setAnnotations($annotations) {
+        $this->annotations = $annotations;
+    }
+
+    function setSuperClassDesc($superClassDesc) {
+        $this->superClassDesc = $superClassDesc;
+    }
+
+
     public function getFlags() {
         return $this->flags;
     }
@@ -47,6 +68,16 @@ class ClassDesc extends Handled {
         return $this;
     }
 
+    public function getAllDeclaredFields() {
+        $fields = array();
+
+        if ($this->getSuperClassDesc() != null) {
+            $fields = $this->getSuperClassDesc()->getAllDeclaredFields();
+        }
+
+        return array_merge($fields, $this->getFieldDescList());
+    }
+
     public function getName() {
         return $this->name;
     }
@@ -56,14 +87,18 @@ class ClassDesc extends Handled {
         return $this;
     }
 
-    public function __toString() {
+    public function toString() {
         return
             ToStringHelper::object($this)
                 ->ommitNull()
                 ->add("name", $this->getName())
                 ->add("fieldDescList", $this->getFieldDescList())
                 ->add("serialVersionUid", $this->getSerialVersionUid())
-                ->add("flags", $this->getFlags())
+                ->add("flags", $this->getFlags()->toString())
                 ->toString();
+    }
+
+    public function __toString() {
+        return $this->toString();
     }
 }
