@@ -1,6 +1,11 @@
 <?php
 
 class ObjectInputStream {
+    /**
+     * @var \Monolog\Logger
+     */
+    private $log;
+
     protected $buffer;
 
     protected $length = 0;
@@ -21,6 +26,8 @@ class ObjectInputStream {
         $this->buffer = $buffer;
 
         $this->length = strlen($buffer);
+
+        $this->log = new Monolog\Logger(get_class($this));
     }
 
     /**
@@ -30,14 +37,16 @@ class ObjectInputStream {
         if ($this->logEnabled) {
             $str = call_user_func_array("sprintf", array_merge(array($msg), $args));
 
-            echo
+            $this->
+                log->
+                info(
                 sprintf("%6d",$this->offset)
                     .": ["
                     .$this->bufferContents()
                     ."] "
                     .str_repeat(" ", 4*$this->depth)
                     .$str
-                    ."\n";
+                );
         }
 
         return $this;

@@ -1,9 +1,21 @@
 <?php
 
+use Monolog\Logger;
+use gossi\codegen\model\PhpClass;
+use gossi\codegen\model\PhpProperty;
+use gossi\codegen\generator\CodeGenerator;
+
 class ObjectDesc extends Handled {
+    private $log;
+
     protected $classDesc;
 
     protected $fields;
+
+    public function __construct()
+    {
+        $this->log = new Logger(get_class($this));
+    }
 
     /**
      *
@@ -58,8 +70,26 @@ class ObjectDesc extends Handled {
                 $fieldsList[] = "public $".$name.";";
             }
 
+            $this->log->debug($this->getClassDesc());
+
             $code = 'namespace '.$nameSpace.';class '.$clname.'{'.implode("\n", $fieldsList).'} $c= new '.$clname.'();';
+
+            $generatingClass = new PhpClass();
+            $generatingClass
+                ->setName($clname)
+                ->setNamespace($nameSpace);
+
+            $generatingClass->setParentClassName($this->getClassDesc()->getSuperClassDesc()->getName());
+
+            foreach ($fieldsList as $field) {
+                $generatingClass->setProperty(PhpProperty::create($field));
+            }
+
+            $generator = new CodeGenerator(array());
+            echo '+++'.$generator->generate($generatingClass).'+++';
         }
+
+        //echo $code."\n";
 
         eval($code);
 
@@ -75,7 +105,7 @@ class ObjectDesc extends Handled {
     }
 
     public function __toString() {
-
+        return "";
     }
 
 }

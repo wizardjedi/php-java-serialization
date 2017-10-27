@@ -11,6 +11,9 @@ class ClassDesc extends Handled {
 
     protected $annotations;
 
+    /**
+     * @var ClassDesc
+     */
     protected $superClassDesc;
 
     function getAnnotations() {

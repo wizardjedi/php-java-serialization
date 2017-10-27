@@ -190,7 +190,13 @@ class ObjectInputStreamTest extends PHPUnit\Framework\TestCase {
 
     /**
      * JAVA CODE:
-
+     *  public static class Cls1 implements Serializable {
+     *      protected Long val = new Long(123);
+     *  }
+     *
+     *  public static class Cls2 extends Cls1 {
+     *      protected String val2 = "Test string";
+     *  }
      */
     public function testPrimitiveInheritedClass() {
         /*
@@ -243,5 +249,7 @@ class ObjectInputStreamTest extends PHPUnit\Framework\TestCase {
             throw $e;
         }
         var_dump($object);
+
+        var_dump(get_parent_class(get_class($object)));
     }
 }
