@@ -2,7 +2,7 @@
 
 class ObjectInputStream {
     /**
-     * @var \Monolog\Logger
+     * @var \Psr\Log\LoggerInterface
      */
     private $log;
 
@@ -22,12 +22,16 @@ class ObjectInputStream {
 
     protected $depth = 0;
 
-    function __construct($buffer) {
+    function __construct($buffer, $logger = null) {
         $this->buffer = $buffer;
 
         $this->length = strlen($buffer);
 
-        $this->log = new Monolog\Logger(get_class($this));
+        if ($logger != null) {
+            $this->log = $logger;
+        } else {
+            $this->log = new Monolog\Logger(get_class($this));
+        }
     }
 
     /**

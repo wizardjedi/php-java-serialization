@@ -53,13 +53,11 @@ class ObjectDesc extends Handled {
     public function createObject($objectDesc) {
         $name = $this->getClassDesc()->getName();
 
-        $fullName = str_replace(array('.','$'), "\\", $name);
+        $info = ObjectUtil::getClassNameInfo($name);
 
-        $parts = explode("\\", $fullName);
+        $nameSpace = ObjectUtil::getNamespaceByInfo($info);
 
-        $nameSpace = implode("\\", array_slice($parts, 0, count($parts)-1));
-
-        $clname = array_slice($parts, count($parts)-1)[0];
+        $clname = ObjectUtil::getClassnameByInfo($info);
 
         if (class_exists($nameSpace.'\\'.$clname)) {
             $code = '$c = new '.$nameSpace.'\\'.$clname.'();';
